@@ -514,5 +514,20 @@
   "popup.siyuan.errorTitle": "无法连接到思源笔记",
   "popup.siyuan.savedTitle": "已保存到思源笔记",
   "popup.sidePanel": "侧边栏",
-  "popup.sidePanelTip": "在浏览器右侧全高侧边栏中打开"
+  "popup.sidePanelTip": "在浏览器右侧全高侧边栏中打开",
+  "options.siyuan.title": "思源笔记",
+  "options.siyuan.subtitle": "将对话直接以 Markdown 文档保存到本地思源笔记。",
+  "options.siyuan.saveTitle": "保存对话到思源笔记",
+  "options.siyuan.help": "通过本地思源笔记 Kernel API 连接，导出对话时可直接选择目标笔记本与路径并创建 Markdown 文档。",
+  "options.siyuan.tip": "API Token 仅保存在当前浏览器本地存储中，只发送给您配置的思源 API 地址。",
+  "options.siyuan.statusConnected": "已连接到 {url}",
+  "options.siyuan.statusDisconnected": "未连接",
+  "options.siyuan.disconnect": "断开连接",
+  "options.siyuan.keyIntro": "连接到本地思源笔记 Kernel API（默认 http://127.0.0.1:6806）：",
+  "options.siyuan.step1": "确保本机已启动思源笔记客户端。",
+  "options.siyuan.step2": "打开思源笔记「设置 → 关于」，复制 API token。",
+  "options.siyuan.step3": "在下方填写 API 地址和 Token 后点击连接。",
+  "options.siyuan.urlLabel": "API 地址",
+  "options.siyuan.tokenLabel": "API Token",
+  "options.siyuan.connect": "连接"
 }

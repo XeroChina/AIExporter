@@ -1775,6 +1775,9 @@
         <rect x="4" y="3.5" width="16" height="17" rx="2.5" />
         <path d="M9 16.5v-9l6 9v-9" />
       </symbol>
+      <symbol id="i-siyuan" viewBox="0 0 24 24">
+        <path d="M4 17.5V6.5l5 4.5 3-4.5 3 4.5 5-4.5v11l-5-4.5-3 4.5-3-4.5-5 4.5Z" />
+      </symbol>
       <symbol id="i-upload" viewBox="0 0 24 24">
         <path d="M12 15V4M7.5 8.5 12 4l4.5 4.5" />
         <path
@@ -1992,6 +1995,10 @@
           <a class="nav-link" href="#notion">
             <svg class="icon" aria-hidden="true"><use href="#i-notion" /></svg>
             <span data-i18n="options.notion.title">Notion</span>
+          </a>
+          <a class="nav-link" href="#siyuan">
+            <svg class="icon" aria-hidden="true"><use href="#i-siyuan" /></svg>
+            <span data-i18n="options.siyuan.title">SiYuan Note</span>
           </a>
         </nav>
       </div>
@@ -4041,6 +4048,134 @@
                 </button>
               </div>
               <p class="notion-key-error" id="notion-key-error" role="alert" hidden></p>
+            </div>
+          </div>
+        </section>
+
+        <!-- =================== SIYUAN ===================== -->
+        <section class="card" id="siyuan" aria-labelledby="siyuan-title">
+          <header class="card-header">
+            <span class="card-icon" aria-hidden="true">
+              <svg class="icon"><use href="#i-siyuan" /></svg>
+            </span>
+            <div>
+              <h2
+                class="card-title"
+                id="siyuan-title"
+                data-i18n="options.siyuan.title"
+              >
+                SiYuan Note
+              </h2>
+              <p class="card-subtitle" data-i18n="options.siyuan.subtitle">
+                Save chats directly as Markdown documents in your local SiYuan Note.
+              </p>
+            </div>
+          </header>
+
+          <div
+            class="setting"
+            data-help="options.siyuan.help"
+            data-tip="options.siyuan.tip"
+          >
+            <div class="setting-head">
+              <span class="setting-icon" aria-hidden="true">
+                <svg class="icon"><use href="#i-upload" /></svg>
+              </span>
+              <div class="setting-text">
+                <div class="setting-title-row">
+                  <span
+                    class="setting-title"
+                    data-i18n="options.siyuan.saveTitle"
+                    >Save chats to SiYuan Note</span
+                  >
+                  <button
+                    type="button"
+                    class="help-button"
+                    aria-label="What does this do?"
+                    data-i18n-aria-label="options.moreInfo"
+                  >
+                    ?
+                  </button>
+                </div>
+                <p class="setting-desc">
+                  <span class="status" id="siyuan-status" role="status"
+                    >Not connected</span
+                  >
+                </p>
+              </div>
+            </div>
+            <div class="setting-control">
+              <button
+                type="button"
+                class="button button--danger"
+                id="siyuan-disconnect"
+                data-i18n="options.siyuan.disconnect"
+                hidden
+              >
+                Disconnect
+              </button>
+            </div>
+
+            <div class="setting-extra notion-key" id="siyuan-key">
+              <p class="notion-key-intro" data-i18n="options.siyuan.keyIntro">
+                Connect to your local SiYuan Note Kernel API (default http://127.0.0.1:6806):
+              </p>
+              <ol class="notion-steps">
+                <li data-i18n="options.siyuan.step1">
+                  Make sure SiYuan Note is running on your computer.
+                </li>
+                <li data-i18n="options.siyuan.step2">
+                  In SiYuan Note, open Settings → About → copy your API token.
+                </li>
+                <li data-i18n="options.siyuan.step3">
+                  Paste the API URL and token below, then click Connect.
+                </li>
+              </ol>
+              <div class="notion-key-row">
+                <label
+                  class="field-label"
+                  for="siyuan-url"
+                  data-i18n="options.siyuan.urlLabel"
+                  >API URL</label
+                >
+                <input
+                  type="url"
+                  class="text-input"
+                  id="siyuan-url"
+                  autocomplete="off"
+                  spellcheck="false"
+                  maxlength="200"
+                  value="http://127.0.0.1:6806"
+                  placeholder="http://127.0.0.1:6806"
+                />
+              </div>
+              <div class="notion-key-row" style="margin-top: 8px">
+                <label
+                  class="field-label"
+                  for="siyuan-token"
+                  data-i18n="options.siyuan.tokenLabel"
+                  >API Token</label
+                >
+                <input
+                  type="password"
+                  class="text-input"
+                  id="siyuan-token"
+                  autocomplete="off"
+                  spellcheck="false"
+                  maxlength="200"
+                  data-i18n-placeholder="popup.siyuan.tokenPlaceholder"
+                  placeholder="API token"
+                />
+                <button
+                  type="button"
+                  class="button button--notion"
+                  id="siyuan-connect"
+                  data-i18n="options.siyuan.connect"
+                >
+                  Connect
+                </button>
+              </div>
+              <p class="notion-key-error" id="siyuan-error" role="alert" hidden></p>
             </div>
           </div>
         </section>

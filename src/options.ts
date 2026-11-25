@@ -275,6 +275,27 @@ const notionKeyError = document.getElementById(
   "notion-key-error",
 ) as HTMLParagraphElement;
 
+/* SiYuan Note */
+const siyuanStatusLabel = document.getElementById(
+  "siyuan-status",
+) as HTMLSpanElement;
+const siyuanDisconnectButton = document.getElementById(
+  "siyuan-disconnect",
+) as HTMLButtonElement;
+const siyuanKeyPanel = document.getElementById("siyuan-key") as HTMLDivElement;
+const siyuanUrlInput = document.getElementById(
+  "siyuan-url",
+) as HTMLInputElement;
+const siyuanTokenInput = document.getElementById(
+  "siyuan-token",
+) as HTMLInputElement;
+const siyuanConnectButton = document.getElementById(
+  "siyuan-connect",
+) as HTMLButtonElement;
+const siyuanError = document.getElementById(
+  "siyuan-error",
+) as HTMLParagraphElement;
+
 const backupCard = document.getElementById("backup") as HTMLElement;
 const backupEnabledInput = document.getElementById(
   "backupEnabled",
@@ -624,6 +645,7 @@ function renderTranslations(): void {
   });
   renderGithub();
   renderNotion();
+  renderSiyuan();
   renderBackup();
   void renderShortcuts();
   applySearch();
@@ -1637,6 +1659,7 @@ function setNotionState(state: NotionUiState, connecting = false): void {
   notionState = state;
   notionConnecting = connecting;
   renderNotion();
+  renderSiyuan();
 }
 
 function showNotionKeyError(message: string): void {
@@ -1725,6 +1748,124 @@ notionDisconnectButton.addEventListener("click", async () => {
   } finally {
     notionDisconnectButton.disabled = false;
     setNotionState({ kind: "disconnected" });
+  }
+});
+
+/*
+ * ---------------------------------------------------------
+ * SIYUAN NOTE
+ * ---------------------------------------------------------
+ */
+type SiyuanUiState =
+  | { kind: "disconnected"; apiUrl: string }
+  | { kind: "connected"; apiUrl: string };
+
+let siyuanState: SiyuanUiState = {
+  kind: "disconnected",
+  apiUrl: "http://127.0.0.1:6806",
+};
+let siyuanConnecting = false;
+
+function renderSiyuan(): void {
+  const connected = siyuanState.kind === "connected";
+
+  siyuanStatusLabel.textContent = connected
+    ? t("options.siyuan.statusConnected", { url: siyuanState.apiUrl })
+    : t("options.siyuan.statusDisconnected");
+
+  siyuanStatusLabel.classList.toggle("is-connected", connected);
+  siyuanStatusLabel.classList.remove("is-error");
+
+  siyuanDisconnectButton.hidden = !connected;
+  siyuanKeyPanel.hidden = connected;
+  siyuanConnectButton.disabled = siyuanConnecting;
+}
+
+function setSiyuanState(state: SiyuanUiState, connecting = false): void {
+  siyuanState = state;
+  siyuanConnecting = connecting;
+  if (state.apiUrl && !siyuanUrlInput.value.trim()) {
+    siyuanUrlInput.value = state.apiUrl;
+  }
+  renderSiyuan();
+}
+
+function showSiyuanError(message: string): void {
+  siyuanError.textContent = message;
+  siyuanError.hidden = message === "";
+}
+
+async function refreshSiyuanStatus(): Promise<void> {
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "SIYUAN_GET_STATUS",
+    });
+
+    const apiUrl =
+      typeof response?.data?.apiUrl === "string" && response.data.apiUrl
+        ? response.data.apiUrl
+        : "http://127.0.0.1:6806";
+
+    siyuanUrlInput.value = apiUrl;
+    setSiyuanState(
+      response?.success && response.data?.connected
+        ? { kind: "connected", apiUrl }
+        : { kind: "disconnected", apiUrl },
+    );
+  } catch (error) {
+    devError("AI Exporter: SiYuan status check failed", error);
+    setSiyuanState({ kind: "disconnected", apiUrl: "http://127.0.0.1:6806" });
+  }
+}
+
+async function connectSiyuanSettings(): Promise<void> {
+  const apiUrl = siyuanUrlInput.value.trim() || "http://127.0.0.1:6806";
+  const apiToken = siyuanTokenInput.value.trim();
+
+  showSiyuanError("");
+  setSiyuanState(siyuanState, true);
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "SIYUAN_CONNECT",
+      apiUrl,
+      apiToken,
+    });
+
+    if (!response?.success) {
+      throw new Error(response?.error ?? t("popup.siyuan.connectFailed"));
+    }
+
+    siyuanTokenInput.value = "";
+    await refreshSiyuanStatus();
+  } catch (error) {
+    devError("AI Exporter: SiYuan connect failed", error);
+    setSiyuanState(siyuanState);
+    showSiyuanError(
+      error instanceof Error ? error.message : t("popup.siyuan.connectFailed"),
+    );
+  }
+}
+
+siyuanConnectButton.addEventListener("click", () => {
+  void connectSiyuanSettings();
+});
+
+siyuanTokenInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    void connectSiyuanSettings();
+  }
+});
+
+siyuanDisconnectButton.addEventListener("click", async () => {
+  siyuanDisconnectButton.disabled = true;
+
+  try {
+    await chrome.runtime.sendMessage({ type: "SIYUAN_DISCONNECT" });
+  } finally {
+    siyuanDisconnectButton.disabled = false;
+    setSiyuanState({ kind: "disconnected", apiUrl: siyuanState.apiUrl });
   }
 });
 
@@ -1977,4 +2118,5 @@ async function init(): Promise<void> {
 init().then(() => {
   void refreshGithubStatus();
   void refreshNotionStatus();
+  void refreshSiyuanStatus();
 });

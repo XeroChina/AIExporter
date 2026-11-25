@@ -514,5 +514,20 @@
   "popup.siyuan.errorTitle": "Could not reach SiYuan",
   "popup.siyuan.savedTitle": "Saved to SiYuan Note",
   "popup.sidePanel": "Side Panel",
-  "popup.sidePanelTip": "Open in full-height Side Panel"
+  "popup.sidePanelTip": "Open in full-height Side Panel",
+  "options.siyuan.title": "SiYuan Note",
+  "options.siyuan.subtitle": "Save chats directly as Markdown documents in your local SiYuan Note.",
+  "options.siyuan.saveTitle": "Save chats to SiYuan Note",
+  "options.siyuan.help": "Connect AI Exporter to your local SiYuan Note Kernel API so you can save any conversation as a Markdown document into your chosen notebook.",
+  "options.siyuan.tip": "Your API token is stored only in this browser locally and only sent to the SiYuan API URL you configure.",
+  "options.siyuan.statusConnected": "Connected to {url}",
+  "options.siyuan.statusDisconnected": "Not connected",
+  "options.siyuan.disconnect": "Disconnect",
+  "options.siyuan.keyIntro": "Connect to your local SiYuan Note Kernel API (default http://127.0.0.1:6806):",
+  "options.siyuan.step1": "Make sure SiYuan Note is running on your computer.",
+  "options.siyuan.step2": "In SiYuan Note, open Settings -> About -> copy your API token.",
+  "options.siyuan.step3": "Paste the API URL and token below, then click Connect.",
+  "options.siyuan.urlLabel": "API URL",
+  "options.siyuan.tokenLabel": "API Token",
+  "options.siyuan.connect": "Connect"
 }
