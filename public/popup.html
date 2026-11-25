@@ -124,8 +124,10 @@
       }
 
       body {
-        width: 360px;
+        width: 480px;
+        height: 600px;
         margin: 0;
+        overflow: hidden;
         color: var(--text);
         background: var(--bg);
         font-family:
@@ -141,11 +143,16 @@
         -webkit-font-smoothing: antialiased;
       }
 
+      #main-view {
+        height: 100%;
+        overflow-y: auto;
+        box-sizing: border-box;
+      }
+
       /*
-       * The export and GitHub screens take the popup's full
-       * height (browsers cap popups at 600px), so their message
-       * list can scroll while the buttons stay in view. The
-       * main screen is only as tall as its content.
+       * All popup screens share the same 480x600 size (browsers
+       * cap popups at 600px) so navigating between them never
+       * resizes the popup window.
        */
       body.is-full {
         width: 480px;
