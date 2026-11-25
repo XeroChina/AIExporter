@@ -8,6 +8,7 @@ import {
   readKimiToken,
 } from "../src/kimi-conversation";
 import {
+  DOUBAO_HEADERS,
   convertDoubaoMessages,
   doubaoQuery,
   getDoubaoConversationId,
@@ -128,6 +129,11 @@ describe("Doubao", () => {
     expect(getDoubaoConversationId("/chat/7356014282391")).toBe("7356014282391");
     expect(getDoubaoConversationId("/chat/")).toBeNull();
     expect(getDoubaoConversationId("/chat/local_123")).toBeNull();
+  });
+
+  it("sends the encoding=utf-8 Content-Type required by Doubao's IM gateway", () => {
+    expect(DOUBAO_HEADERS["Content-Type"]).toBe("application/json; encoding=utf-8");
+    expect(DOUBAO_HEADERS["agw-js-conv"]).toBe("str");
   });
 
   it("sends the query the web app's own requests carry", () => {

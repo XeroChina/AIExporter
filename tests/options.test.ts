@@ -302,7 +302,7 @@ describe("options page", () => {
       byId<HTMLInputElement>("includeTimestamp").click();
       await vi.advanceTimersByTimeAsync(300);
 
-      expect(savedSettings().askWhereToSave).toBe(false);
+      expect(savedSettings().askWhereToSave).toBe(true);
       expect(savedSettings().includeTimestamp).toBe(true);
     });
   });

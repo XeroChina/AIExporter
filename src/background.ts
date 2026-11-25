@@ -17,6 +17,14 @@ import {
   getNotionConnection,
   listNotionPages,
 } from "./notion.ts";
+import {
+  DEFAULT_SIYUAN_URL,
+  connectSiyuan,
+  createSiyuanDoc,
+  disconnectSiyuan,
+  getSiyuanConnection,
+  listSiyuanNotebooks,
+} from "./siyuan.ts";
 import type { NotionBlock } from "./notion-blocks.ts";
 import { initI18n, t } from "./i18n.ts";
 import { decodeBase64, copyToArrayBuffer, encodeBlobBase64 } from "./zip.ts";
@@ -143,12 +151,45 @@ function isOwnExtensionSender(sender: chrome.runtime.MessageSender): boolean {
 const trackedDownloadIds = new Set<number>();
 const pendingObjectUrls = new Map<number, string>();
 const pendingDownloadTabIds = new Map<number, number>();
+const pendingFilenames = new Map<
+  number,
+  { filename: string; conflictAction: "uniquify" | "overwrite" }
+>();
+const pendingUrlFilenames = new Map<
+  string,
+  { filename: string; conflictAction: "uniquify" | "overwrite" }
+>();
+
+/*
+ * Chromium can ignore the `filename` option on `blob:` URLs (especially
+ * when another download manager extension listens to downloads or when
+ * the blob comes from an offscreen document), falling back to the blob
+ * URL's UUID (e.g. `c9cdee75-....docx`). Suggesting our intended name
+ * in onDeterminingFilename forces Chrome/Edge to honor it.
+ */
+chrome.downloads.onDeterminingFilename?.addListener((item, suggest) => {
+  const pending =
+    pendingFilenames.get(item.id) ?? pendingUrlFilenames.get(item.url);
+
+  if (!pending) {
+    return;
+  }
+
+  pendingUrlFilenames.delete(item.url);
+  suggest({
+    filename: pending.filename,
+    conflictAction:
+      pending.conflictAction as chrome.downloads.FilenameConflictAction,
+  });
+});
 
 function revokePendingObjectUrl(downloadId: number): void {
+  pendingFilenames.delete(downloadId);
   const url = pendingObjectUrls.get(downloadId);
 
   if (url !== undefined) {
     pendingObjectUrls.delete(downloadId);
+    pendingUrlFilenames.delete(url);
     revokeDownloadUrl(url);
   }
 }
@@ -350,8 +391,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       objectUrl = await createDownloadUrl(message.content, message.mimeType);
 
       const url = objectUrl;
-      const download = (filename: string): Promise<number> =>
-        chrome.downloads.download({ url, filename, saveAs: message.saveAs });
+      let resolvedFilename = message.filename;
+      const download = (filename: string): Promise<number> => {
+        resolvedFilename = filename;
+        pendingUrlFilenames.set(url, { filename, conflictAction: "uniquify" });
+
+        return chrome.downloads.download({
+          url,
+          filename,
+          conflictAction: "uniquify",
+          saveAs: message.saveAs,
+        });
+      };
 
       /*
        * A browser that still turns the name down ("Invalid
@@ -376,6 +427,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       trackedDownloadIds.add(downloadId);
       pendingObjectUrls.set(downloadId, objectUrl);
+      pendingFilenames.set(downloadId, {
+        filename: resolvedFilename,
+        conflictAction: "uniquify",
+      });
 
       if (typeof message.tabId === "number") {
         pendingDownloadTabIds.set(downloadId, message.tabId);
@@ -384,6 +439,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: true, data: { downloadId } });
     } catch (error) {
       if (objectUrl) {
+        pendingUrlFilenames.delete(objectUrl);
         revokeDownloadUrl(objectUrl);
       }
 
@@ -1165,6 +1221,71 @@ handleNotion(
 
 /*
  * ---------------------------------------------------------
+ * SIYUAN NOTE
+ * ---------------------------------------------------------
+ */
+handleNotion("SIYUAN_GET_STATUS", async () => {
+  const connection = await getSiyuanConnection();
+
+  return {
+    connected: connection !== null,
+    apiUrl: connection?.apiUrl ?? DEFAULT_SIYUAN_URL,
+  };
+});
+
+handleNotion("SIYUAN_CONNECT", async (message) => {
+  if (
+    typeof message.apiUrl !== "string" ||
+    message.apiUrl.length > 500 ||
+    typeof message.apiToken !== "string" ||
+    message.apiToken.length > 500
+  ) {
+    throw new Error("Invalid request.");
+  }
+
+  const connection = await connectSiyuan(message.apiUrl, message.apiToken);
+
+  return { apiUrl: connection.apiUrl };
+});
+
+handleNotion("SIYUAN_DISCONNECT", async () => {
+  await disconnectSiyuan();
+  return null;
+});
+
+handleNotion("SIYUAN_LIST_NOTEBOOKS", () => listSiyuanNotebooks());
+
+handleNotion(
+  "SIYUAN_SAVE_DOC",
+  async (message) => {
+    if (
+      typeof message.notebookId !== "string" ||
+      message.notebookId.length === 0 ||
+      message.notebookId.length > 128 ||
+      typeof message.parentPath !== "string" ||
+      message.parentPath.length > 500 ||
+      typeof message.title !== "string" ||
+      message.title.length === 0 ||
+      message.title.length > 500 ||
+      typeof message.markdown !== "string" ||
+      message.markdown.length === 0 ||
+      message.markdown.length > MAX_EXPORT_CONTENT_LENGTH
+    ) {
+      throw new Error("Invalid save request.");
+    }
+
+    return createSiyuanDoc(
+      message.notebookId,
+      message.parentPath,
+      message.title,
+      message.markdown,
+    );
+  },
+  true,
+);
+
+/*
+ * ---------------------------------------------------------
  * UPDATES
  * ---------------------------------------------------------
  *
@@ -1739,6 +1860,11 @@ async function saveBackupDownload(file: BackupFile): Promise<void> {
       );
 
   try {
+    pendingUrlFilenames.set(url, {
+      filename: file.path,
+      conflictAction: "overwrite",
+    });
+
     const id = await chrome.downloads.download({
       url,
       filename: file.path,
@@ -1746,12 +1872,19 @@ async function saveBackupDownload(file: BackupFile): Promise<void> {
       saveAs: false,
     });
 
+    pendingFilenames.set(id, {
+      filename: file.path,
+      conflictAction: "overwrite",
+    });
+
     try {
       await downloadFinished(id);
     } finally {
+      pendingFilenames.delete(id);
       void chrome.downloads.erase({ id }).catch(() => undefined);
     }
   } finally {
+    pendingUrlFilenames.delete(url);
     revokeDownloadUrl(url);
   }
 }

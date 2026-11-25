@@ -138,7 +138,7 @@ export const DEFAULT_SETTINGS: Settings = {
   markdownProperties: true,
   headingStyle: "h2",
   messageSeparator: "double",
-  askWhereToSave: true,
+  askWhereToSave: false,
   fileNameTemplate: "",
   downloadImagesLocally: false,
   includeSources: true,

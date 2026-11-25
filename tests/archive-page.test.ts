@@ -139,7 +139,7 @@ describe("the data export page", () => {
     expect(download).toHaveBeenCalledWith({
       url: "blob:zip",
       filename: expect.stringMatching(/^claude-export-\d{4}-\d{2}-\d{2}\.zip$/),
-      saveAs: true,
+      saveAs: false,
     });
   });
 });

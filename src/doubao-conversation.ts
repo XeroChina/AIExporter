@@ -99,8 +99,15 @@ export function doubaoQuery(
   return `?${params.toString()}`;
 }
 
+/*
+ * Doubao's IM gateway requires the non-standard `encoding=utf-8`
+ * parameter on Content-Type; plain `application/json` (or
+ * `charset=utf-8`) is rejected with status_code 712012002
+ * ("不支持编码类型").
+ */
 export const DOUBAO_HEADERS: Record<string, string> = {
   "agw-js-conv": "str",
+  "Content-Type": "application/json; encoding=utf-8",
 };
 
 function request(cmd: number, body: Record<string, unknown>, sequenceId: string): string {

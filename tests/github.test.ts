@@ -135,9 +135,11 @@ describe("github", () => {
     ["Firefox", firefoxManifest],
   ])("the %s manifest", (_browser, manifest) => {
     it("asks for GitHub only when the person connects it", () => {
-      expect(manifest).not.toHaveProperty("host_permissions");
+      const hostPermissions =
+        (manifest as { host_permissions?: string[] }).host_permissions ?? [];
 
       for (const origin of github.GITHUB_HOST_PERMISSIONS) {
+        expect(hostPermissions).not.toContain(origin);
         expect(manifest.optional_host_permissions).toContain(origin);
       }
     });

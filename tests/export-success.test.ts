@@ -3,15 +3,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
- * ---------------------------------------------------------
- * WHY THIS FILE EXISTS
- * ---------------------------------------------------------
- *
- * Covers the "export complete" dialog the content script shows
- * in the chat page once a download or GitHub save finishes:
- * what it says, where its links go (the right store for the
- * browser, a ready-to-send feedback email) and that closing it
- * leaves nothing behind on the page.
+ * Covers the brief auto-dismissing success toast shown in the chat
+ * page once a download or save completes.
  */
 
 type Listener = (
@@ -20,7 +13,7 @@ type Listener = (
   sendResponse: (response?: unknown) => void,
 ) => boolean | void;
 
-const OVERLAY_ID = "ai-exporter-export-success-overlay";
+const TOAST_ID = "ai-exporter-toast";
 
 const onMessageListeners: Listener[] = [];
 
@@ -54,160 +47,72 @@ async function loadContentScript(
   });
 
   await import("../src/content");
-  /* Let initContentI18n's storage read settle. */
   await Promise.resolve();
   await Promise.resolve();
 }
 
-function showOverlay(): HTMLElement {
+function triggerExportSuccess(): HTMLElement {
   for (const listener of onMessageListeners) {
     listener({ type: "SHOW_EXPORT_SUCCESS" }, {}, () => undefined);
   }
 
-  const overlay = document.getElementById(OVERLAY_ID);
+  const toast = document.getElementById(TOAST_ID);
 
-  if (!overlay) {
-    throw new Error("Overlay was not shown");
+  if (!toast) {
+    throw new Error("Toast was not shown");
   }
 
-  return overlay;
+  return toast;
 }
 
-function link(overlay: HTMLElement, name: string): HTMLAnchorElement {
-  const anchor = overlay.querySelector<HTMLAnchorElement>(
-    `[data-aie-link="${name}"]`,
-  );
-
-  if (!anchor) {
-    throw new Error(`No ${name} link`);
-  }
-
-  return anchor;
-}
-
-describe("export success dialog", () => {
+describe("export success toast", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.spyOn(console, "log").mockImplementation(() => undefined);
   });
 
   afterEach(() => {
-    document.getElementById(OVERLAY_ID)?.remove();
+    document.getElementById(TOAST_ID)?.remove();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
-  it("confirms the export and says the extension is free", async () => {
+  it("shows a brief success toast instead of a modal dialog", async () => {
     await loadContentScript();
 
-    const overlay = showOverlay();
-    const dialog = overlay.querySelector('[role="dialog"]');
+    const toast = triggerExportSuccess();
 
-    expect(dialog?.getAttribute("aria-modal")).toBe("true");
-    expect(overlay.textContent).toContain("Export complete");
-    expect(overlay.textContent).toContain("Free for everyone");
-    expect(document.activeElement).toBe(dialog);
+    expect(toast.dataset.tone).toBe("success");
+    expect(toast.getAttribute("role")).toBe("status");
+    expect(toast.textContent).toContain("Export complete");
+    expect(document.getElementById("ai-exporter-export-success-overlay")).toBeNull();
   });
 
-  it("links to the Chrome Web Store reviews in Chrome", async () => {
+  it("auto-dismisses after a short delay", async () => {
     await loadContentScript();
 
-    const review = link(showOverlay(), "review");
+    triggerExportSuccess();
+    expect(document.getElementById(TOAST_ID)).not.toBeNull();
 
-    expect(review.href).toContain("chromewebstore.google.com");
-    expect(review.target).toBe("_blank");
-    expect(review.rel).toContain("noopener");
-  });
-
-  it("links to Firefox Add-ons in Firefox", async () => {
-    await loadContentScript("moz-extension://test-id/");
-
-    const review = link(showOverlay(), "review");
-
-    expect(review.href).toContain("addons.mozilla.org");
-    expect(review.href).toContain("gptchatdownloader@granttotinov.com");
-  });
-
-  it("opens a feedback email with the subject, version, browser and site filled in", async () => {
-    await loadContentScript();
-
-    const email = link(showOverlay(), "email");
-    const url = new URL(email.href);
-
-    expect(url.protocol).toBe("mailto:");
-    expect(url.pathname).toBe("granttotinov604@gmail.com");
-    expect(url.searchParams.get("subject")).toBe("AI Exporter feedback");
-
-    const body = url.searchParams.get("body") ?? "";
-
-    expect(body).toContain("Write your message here:");
-    expect(body).toContain("AI Exporter 9.8.7 · Chrome · claude.ai");
+    vi.advanceTimersByTime(4000);
+    expect(document.getElementById(TOAST_ID)).toBeNull();
   });
 
   it("uses the chosen language", async () => {
-    await loadContentScript("chrome-extension://test-id/", "de");
+    await loadContentScript("chrome-extension://test-id/", "zh");
 
-    const overlay = showOverlay();
+    const toast = triggerExportSuccess();
 
-    expect(overlay.textContent).toContain("Export abgeschlossen");
-    expect(
-      new URL(link(overlay, "email").href).searchParams.get("subject"),
-    ).toBe("Feedback zu AI Exporter");
+    expect(toast.textContent).toContain("导出完成");
   });
 
-  it("copies the email address for people without a mail app", async () => {
+  it("reuses a single toast across repeated exports", async () => {
     await loadContentScript();
 
-    const writeText = vi.fn(() => Promise.resolve());
-    Object.defineProperty(navigator, "clipboard", {
-      value: { writeText },
-      configurable: true,
-    });
+    triggerExportSuccess();
+    triggerExportSuccess();
 
-    const overlay = showOverlay();
-    overlay.querySelector<HTMLButtonElement>("[data-aie-copy]")?.click();
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(writeText).toHaveBeenCalledWith("granttotinov604@gmail.com");
-    expect(overlay.querySelector<HTMLElement>(".aie-copied")?.hidden).toBe(
-      false,
-    );
-  });
-
-  it.each([
-    ["the close button", () =>
-      document
-        .querySelector<HTMLButtonElement>("#ai-exporter-export-success-close")
-        ?.click()],
-    ["the corner X", () =>
-      document.querySelector<HTMLButtonElement>(".aie-dismiss")?.click()],
-    ["Escape", () =>
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))],
-    ["a click on the backdrop", () =>
-      document.getElementById(OVERLAY_ID)?.click()],
-  ])("closes with %s", async (_name, close) => {
-    await loadContentScript();
-    showOverlay();
-
-    close();
-
-    expect(document.getElementById(OVERLAY_ID)).toBeNull();
-  });
-
-  it("doesn't stack dialogs, styles or Escape listeners across exports", async () => {
-    await loadContentScript();
-    const removeListener = vi.spyOn(document, "removeEventListener");
-
-    showOverlay();
-    showOverlay();
-
-    expect(document.querySelectorAll(`#${OVERLAY_ID}`)).toHaveLength(1);
-    expect(document.head.querySelectorAll("style")).toHaveLength(0);
-    expect(removeListener).toHaveBeenCalledWith("keydown", expect.any(Function));
-
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-
-    expect(document.getElementById(OVERLAY_ID)).toBeNull();
-    expect(document.querySelectorAll("style")).toHaveLength(0);
+    expect(document.querySelectorAll(`#${TOAST_ID}`)).toHaveLength(1);
   });
 });

@@ -18,6 +18,10 @@
     "downloads",
     "storage"
   ],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
   "optional_host_permissions": [
     "https://github.com/*",
     "https://api.github.com/*",

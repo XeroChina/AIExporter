@@ -552,6 +552,7 @@ describe("background.ts download flow (Chrome + Firefox parity)", () => {
       expect(downloadsDownload).toHaveBeenCalledWith({
         url: "blob:mock-url-1",
         filename: "conversation.md",
+        conflictAction: "uniquify",
         saveAs: true,
       });
     });
@@ -875,6 +876,7 @@ describe("background.ts download flow (Chrome + Firefox parity)", () => {
       expect(downloadsDownload).toHaveBeenCalledWith({
         url: offscreenUrl,
         filename: "conversation.md",
+        conflictAction: "uniquify",
         saveAs: true,
       });
     });

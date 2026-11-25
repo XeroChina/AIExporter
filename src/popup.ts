@@ -257,6 +257,9 @@ const selectorGithubButton = document.getElementById(
 const selectorNotionButton = document.getElementById(
   "selector-notion-button",
 ) as HTMLButtonElement;
+const selectorSiyuanButton = document.getElementById(
+  "selector-siyuan-button",
+) as HTMLButtonElement;
 
 /* "Save to GitHub" screen */
 const githubView = document.getElementById("github-view") as HTMLElement;
@@ -373,6 +376,78 @@ const notionPageName = document.getElementById(
   "notion-page-name",
 ) as HTMLSpanElement;
 const notionFooter = document.getElementById("notion-footer") as HTMLElement;
+
+/* "Save to SiYuan" screen */
+const siyuanView = document.getElementById("siyuan-view") as HTMLElement;
+const siyuanPanelCancelButton = document.getElementById(
+  "siyuan-panel-cancel",
+) as HTMLButtonElement;
+const siyuanTitle = document.getElementById(
+  "siyuan-title",
+) as HTMLHeadingElement;
+const siyuanState = document.getElementById("siyuan-state") as HTMLDivElement;
+const siyuanStateSpinner = document.getElementById(
+  "siyuan-state-spinner",
+) as HTMLSpanElement;
+const siyuanStateIcon = document.getElementById(
+  "siyuan-state-icon",
+) as unknown as SVGSVGElement;
+const siyuanStateIconUse = document.getElementById(
+  "siyuan-state-icon-use",
+) as unknown as SVGUseElement;
+const siyuanStateTitle = document.getElementById(
+  "siyuan-state-title",
+) as HTMLParagraphElement;
+const siyuanStateText = document.getElementById(
+  "siyuan-state-text",
+) as HTMLParagraphElement;
+const siyuanStateAction = document.getElementById(
+  "siyuan-state-action",
+) as HTMLButtonElement;
+const siyuanStateActionLabel = document.getElementById(
+  "siyuan-state-action-label",
+) as HTMLSpanElement;
+const siyuanStateSecondary = document.getElementById(
+  "siyuan-state-secondary",
+) as HTMLButtonElement;
+const siyuanConnectForm = document.getElementById(
+  "siyuan-connect-form",
+) as HTMLDivElement;
+const siyuanApiUrlInput = document.getElementById(
+  "siyuan-api-url",
+) as HTMLInputElement;
+const siyuanApiTokenInput = document.getElementById(
+  "siyuan-api-token",
+) as HTMLInputElement;
+const siyuanConnectButton = document.getElementById(
+  "siyuan-connect-btn",
+) as HTMLButtonElement;
+const siyuanConnectLabel = document.getElementById(
+  "siyuan-connect-label",
+) as HTMLSpanElement;
+const siyuanForm = document.getElementById("siyuan-form") as HTMLDivElement;
+const siyuanNotebookSelect = document.getElementById(
+  "siyuan-notebook-select",
+) as HTMLSelectElement;
+const siyuanParentPathInput = document.getElementById(
+  "siyuan-parent-path",
+) as HTMLInputElement;
+const siyuanDocTitleInput = document.getElementById(
+  "siyuan-doc-title",
+) as HTMLInputElement;
+const siyuanReconfigureButton = document.getElementById(
+  "siyuan-reconfigure-btn",
+) as HTMLButtonElement;
+const siyuanDisconnectButton = document.getElementById(
+  "siyuan-disconnect-btn",
+) as HTMLButtonElement;
+const siyuanFooter = document.getElementById("siyuan-footer") as HTMLElement;
+const siyuanPanelSaveButton = document.getElementById(
+  "siyuan-panel-save",
+) as HTMLButtonElement;
+const siyuanSaveLabel = document.getElementById(
+  "siyuan-save-label",
+) as HTMLSpanElement;
 const notionPanelSaveButton = document.getElementById(
   "notion-panel-save",
 ) as HTMLButtonElement;
@@ -442,13 +517,14 @@ let notionStateSecondaryHandler: (() => void) | null = null;
  * height (body.is-full), so a long message list scrolls inside
  * them while their buttons stay in view.
  */
-type ScreenName = "main" | "export" | "github" | "notion";
+type ScreenName = "main" | "export" | "github" | "notion" | "siyuan";
 
 const screens: Record<ScreenName, HTMLElement> = {
   main: mainView,
   export: exportView,
   github: githubView,
   notion: notionView,
+  siyuan: siyuanView,
 };
 
 let currentScreen: ScreenName = "main";
@@ -469,7 +545,9 @@ function showScreen(name: ScreenName): void {
         ? githubTitle
         : name === "notion"
           ? notionTitle
-          : exportButton;
+          : name === "siyuan"
+            ? siyuanTitle
+            : exportButton;
 
   focusTarget.focus({ preventScroll: true });
 }
@@ -584,11 +662,18 @@ function updateButtons(): void {
   selectorExportButton.disabled = busy || selectedCount === 0;
   selectorGithubButton.disabled = busy || selectedCount === 0;
   selectorNotionButton.disabled = busy || selectedCount === 0;
+  selectorSiyuanButton.disabled = busy || selectedCount === 0;
   githubPanelSaveButton.disabled = busy || githubRepoSelect.value === "";
   notionPanelSaveButton.disabled = busy || notionPageSelect.value === "";
+  siyuanPanelSaveButton.disabled =
+    busy ||
+    siyuanNotebookSelect.value === "" ||
+    siyuanDocTitleInput.value.trim() === "";
+  siyuanConnectButton.disabled = busy;
   selectorCancelButton.disabled = busy;
   githubPanelCancelButton.disabled = busy;
   notionPanelCancelButton.disabled = busy;
+  siyuanPanelCancelButton.disabled = busy;
   githubStarButton.disabled = busy || starring;
   buyCoffeeButton.disabled = busy;
   updateApplyButton.disabled = busy || installingUpdate;
@@ -2309,6 +2394,356 @@ async function saveToNotion(): Promise<void> {
 
 notionPanelSaveButton.addEventListener("click", () => {
   void saveToNotion();
+});
+
+/*
+ * ---------------------------------------------------------
+ * SAVE TO SIYUAN NOTE
+ * ---------------------------------------------------------
+ */
+const SIYUAN_PREFS_KEY = "siyuanSavePrefs";
+
+interface SiyuanNotebookOption {
+  id: string;
+  name: string;
+  icon?: string;
+}
+
+let siyuanNotebooks: SiyuanNotebookOption[] = [];
+let siyuanLoadId = 0;
+let siyuanStateActionHandler: (() => void) | null = null;
+let siyuanStateSecondaryHandler: (() => void) | null = null;
+
+siyuanPanelCancelButton.addEventListener("click", () => {
+  showScreen("export");
+});
+
+siyuanStateAction.addEventListener("click", () => {
+  siyuanStateActionHandler?.();
+});
+
+siyuanStateSecondary.addEventListener("click", () => {
+  siyuanStateSecondaryHandler?.();
+});
+
+function showSiyuanConnectForm(apiUrl = "http://127.0.0.1:6806"): void {
+  siyuanState.hidden = true;
+  siyuanForm.hidden = true;
+  siyuanFooter.hidden = true;
+  siyuanConnectForm.hidden = false;
+  if (apiUrl) {
+    siyuanApiUrlInput.value = apiUrl;
+  }
+  siyuanApiTokenInput.focus({ preventScroll: true });
+}
+
+type SiyuanStateView =
+  | { kind: "loading" }
+  | { kind: "empty" }
+  | { kind: "error"; message: string }
+  | { kind: "saved"; notebook: string; path: string };
+
+function showSiyuanState(view: SiyuanStateView): void {
+  siyuanState.hidden = false;
+  siyuanConnectForm.hidden = true;
+  siyuanForm.hidden = true;
+  siyuanFooter.hidden = true;
+  siyuanStateAction.hidden = true;
+  siyuanStateSecondary.hidden = true;
+  siyuanStateActionHandler = null;
+  siyuanStateSecondaryHandler = null;
+  delete siyuanState.dataset.tone;
+
+  if (view.kind === "loading") {
+    siyuanStateSpinner.hidden = false;
+    siyuanStateIcon.style.display = "none";
+    siyuanStateTitle.textContent = t("popup.siyuan.loadingTitle");
+    siyuanStateText.textContent = "";
+    return;
+  }
+
+  siyuanStateSpinner.hidden = true;
+  siyuanStateIcon.style.display = "";
+
+  if (view.kind === "empty") {
+    siyuanStateIconUse.setAttribute("href", "#i-siyuan");
+    siyuanStateTitle.textContent = t("popup.siyuan.emptyTitle");
+    siyuanStateText.textContent = t("popup.siyuan.emptyText");
+    siyuanStateActionLabel.textContent = t("popup.github.tryAgain");
+    siyuanStateAction.hidden = false;
+    siyuanStateActionHandler = () => {
+      void loadSiyuanNotebooks();
+    };
+    return;
+  }
+
+  if (view.kind === "error") {
+    siyuanState.dataset.tone = "error";
+    siyuanStateIconUse.setAttribute("href", "#i-alert");
+    siyuanStateTitle.textContent = t("popup.siyuan.errorTitle");
+    siyuanStateText.textContent = view.message;
+    siyuanStateActionLabel.textContent = t("popup.github.tryAgain");
+    siyuanStateAction.hidden = false;
+    siyuanStateActionHandler = () => {
+      void loadSiyuanNotebooks();
+    };
+    siyuanStateSecondary.textContent = t("popup.siyuan.reconfigure");
+    siyuanStateSecondary.hidden = false;
+    siyuanStateSecondaryHandler = () => {
+      showSiyuanConnectForm(siyuanApiUrlInput.value);
+    };
+    return;
+  }
+
+  siyuanState.dataset.tone = "success";
+  siyuanStateIconUse.setAttribute("href", "#i-check");
+  siyuanStateTitle.textContent = t("popup.siyuan.savedTitle");
+  siyuanStateText.textContent = `${view.notebook}${view.path}`;
+  siyuanStateActionLabel.textContent = t("popup.github.done");
+  siyuanStateAction.hidden = false;
+  siyuanStateActionHandler = () => {
+    showScreen("export");
+  };
+}
+
+async function loadSiyuanPrefs(): Promise<{
+  notebookId?: string;
+  parentPath?: string;
+}> {
+  try {
+    const stored = await chrome.storage.local.get(SIYUAN_PREFS_KEY);
+    const prefs = stored[SIYUAN_PREFS_KEY] as
+      | { notebookId?: unknown; parentPath?: unknown }
+      | undefined;
+
+    return {
+      notebookId:
+        typeof prefs?.notebookId === "string" ? prefs.notebookId : undefined,
+      parentPath:
+        typeof prefs?.parentPath === "string" ? prefs.parentPath : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+async function loadSiyuanNotebooks(): Promise<void> {
+  const loadId = ++siyuanLoadId;
+  const isStale = (): boolean =>
+    loadId !== siyuanLoadId || currentScreen !== "siyuan";
+
+  siyuanNotebooks = [];
+  siyuanNotebookSelect.replaceChildren();
+  showSiyuanState({ kind: "loading" });
+
+  try {
+    const statusResponse = await chrome.runtime.sendMessage({
+      type: "SIYUAN_GET_STATUS",
+    });
+
+    if (isStale()) {
+      return;
+    }
+
+    const apiUrl =
+      typeof statusResponse?.data?.apiUrl === "string"
+        ? statusResponse.data.apiUrl
+        : "http://127.0.0.1:6806";
+    siyuanApiUrlInput.value = apiUrl;
+
+    if (!statusResponse?.success || !statusResponse.data?.connected) {
+      showSiyuanConnectForm(apiUrl);
+      return;
+    }
+
+    const nbResponse = await chrome.runtime.sendMessage({
+      type: "SIYUAN_LIST_NOTEBOOKS",
+    });
+
+    if (isStale()) {
+      return;
+    }
+
+    if (!nbResponse?.success) {
+      showSiyuanState({
+        kind: "error",
+        message: nbResponse?.error ?? t("popup.siyuan.errorTitle"),
+      });
+      return;
+    }
+
+    const notebooks = nbResponse.data as SiyuanNotebookOption[];
+
+    if (notebooks.length === 0) {
+      showSiyuanState({ kind: "empty" });
+      return;
+    }
+
+    const prefs = await loadSiyuanPrefs();
+
+    if (isStale()) {
+      return;
+    }
+
+    siyuanNotebooks = notebooks;
+    siyuanNotebookSelect.replaceChildren(
+      ...notebooks.map((nb) => new Option(nb.name, nb.id)),
+    );
+
+    if (prefs.notebookId && notebooks.some((nb) => nb.id === prefs.notebookId)) {
+      siyuanNotebookSelect.value = prefs.notebookId;
+    }
+
+    if (prefs.parentPath !== undefined && siyuanParentPathInput.value === "") {
+      siyuanParentPathInput.value = prefs.parentPath;
+    }
+
+    siyuanDocTitleInput.value = notionPageTitle(currentTabTitle, currentTabUrl);
+
+    siyuanState.hidden = true;
+    siyuanConnectForm.hidden = true;
+    siyuanForm.hidden = false;
+    siyuanFooter.hidden = false;
+    updateButtons();
+  } catch (error) {
+    devError("AI Exporter: loading SiYuan notebooks failed", error);
+
+    if (!isStale()) {
+      showSiyuanState({
+        kind: "error",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+}
+
+selectorSiyuanButton.addEventListener("click", () => {
+  if (getSelectedMessages().length === 0) {
+    return;
+  }
+
+  showScreen("siyuan");
+  void loadSiyuanNotebooks();
+});
+
+siyuanNotebookSelect.addEventListener("change", () => {
+  updateButtons();
+});
+
+siyuanDocTitleInput.addEventListener("input", () => {
+  updateButtons();
+});
+
+siyuanReconfigureButton.addEventListener("click", () => {
+  showSiyuanConnectForm(siyuanApiUrlInput.value);
+});
+
+siyuanDisconnectButton.addEventListener("click", () => {
+  void chrome.runtime
+    .sendMessage({ type: "SIYUAN_DISCONNECT" })
+    .then(() => {
+      siyuanApiTokenInput.value = "";
+      showSiyuanConnectForm(siyuanApiUrlInput.value);
+    })
+    .catch(() => undefined);
+});
+
+siyuanConnectButton.addEventListener("click", () => {
+  void (async () => {
+    siyuanConnectButton.classList.add("is-busy");
+    siyuanConnectLabel.textContent = t("popup.siyuan.connecting");
+    setBusy(true);
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: "SIYUAN_CONNECT",
+        apiUrl: siyuanApiUrlInput.value,
+        apiToken: siyuanApiTokenInput.value,
+      });
+
+      if (!response?.success) {
+        throw new Error(response?.error ?? t("popup.siyuan.connectFailed"));
+      }
+
+      await loadSiyuanNotebooks();
+    } catch (error) {
+      devError("AI Exporter: SiYuan connect failed", error);
+      showErrorToast(error, "popup.siyuan.connectFailed");
+    } finally {
+      siyuanConnectButton.classList.remove("is-busy");
+      siyuanConnectLabel.textContent = t("popup.siyuan.connect");
+      setBusy(false);
+    }
+  })();
+});
+
+async function saveToSiyuan(): Promise<void> {
+  const notebookId = siyuanNotebookSelect.value;
+  const notebook = siyuanNotebooks.find((nb) => nb.id === notebookId);
+  const title = siyuanDocTitleInput.value.trim();
+  const parentPath = siyuanParentPathInput.value.trim();
+  const chosen = getSelectedMessages();
+
+  if (!notebook || !title || chosen.length === 0) {
+    return;
+  }
+
+  siyuanPanelSaveButton.classList.add("is-busy");
+  siyuanSaveLabel.textContent = t("popup.github.saving");
+  setBusy(true);
+
+  try {
+    await waitForPaint();
+
+    const markdown = await buildMarkdownFromMessages(chosen, {
+      tabTitle: currentTabTitle,
+      tabUrl: currentTabUrl,
+      properties: true,
+    });
+
+    const saveResponse = await chrome.runtime.sendMessage({
+      type: "SIYUAN_SAVE_DOC",
+      notebookId,
+      parentPath,
+      title,
+      markdown,
+    });
+
+    if (!saveResponse?.success) {
+      throw new Error(saveResponse?.error ?? t("popup.siyuan.saveFailed"));
+    }
+
+    const savedPath =
+      typeof saveResponse.data?.path === "string"
+        ? saveResponse.data.path
+        : `/${title}`;
+
+    showSiyuanState({
+      kind: "saved",
+      notebook: notebook.name,
+      path: savedPath,
+    });
+    siyuanStateAction.focus({ preventScroll: true });
+
+    void chrome.storage.local
+      .set({
+        [SIYUAN_PREFS_KEY]: { notebookId, parentPath },
+      })
+      .catch(() => undefined);
+
+    openExportSuccess();
+  } catch (error) {
+    devError("AI Exporter: SiYuan save failed", error);
+    showErrorToast(error, "popup.siyuan.saveFailed");
+  } finally {
+    siyuanPanelSaveButton.classList.remove("is-busy");
+    siyuanSaveLabel.textContent = t("popup.siyuan.save");
+    setBusy(false);
+  }
+}
+
+siyuanPanelSaveButton.addEventListener("click", () => {
+  void saveToSiyuan();
 });
 
 /*
