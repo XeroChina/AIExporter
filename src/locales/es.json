@@ -512,5 +512,7 @@
   "popup.siyuan.emptyTitle": "No open notebooks found",
   "popup.siyuan.emptyText": "Open or create a notebook in SiYuan Note, then try again.",
   "popup.siyuan.errorTitle": "Could not reach SiYuan",
-  "popup.siyuan.savedTitle": "Saved to SiYuan Note"
+  "popup.siyuan.savedTitle": "Saved to SiYuan Note",
+  "popup.sidePanel": "Side Panel",
+  "popup.sidePanelTip": "Open in full-height Side Panel"
 }

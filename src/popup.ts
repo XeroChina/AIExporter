@@ -3092,6 +3092,76 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 
 /*
  * ---------------------------------------------------------
+ * SIDE PANEL MODE
+ * ---------------------------------------------------------
+ */
+const SIDE_PANEL_SCREEN_KEY = "pendingSidePanelScreen";
+const openSidePanelButton = document.getElementById(
+  "open-sidepanel-button",
+) as HTMLButtonElement | null;
+const exportSidePanelButton = document.getElementById(
+  "export-sidepanel-button",
+) as HTMLButtonElement | null;
+
+let currentWindowId: number | undefined;
+
+async function detectSidePanelMode(): Promise<boolean> {
+  if (window.innerHeight > 620) {
+    return true;
+  }
+
+  try {
+    const contexts = await chrome.runtime.getContexts?.({
+      contextTypes: ["SIDE_PANEL" as chrome.runtime.ContextType],
+    });
+
+    if (Array.isArray(contexts) && contexts.length > 0) {
+      return true;
+    }
+  } catch {
+    /* Older browsers or Firefox */
+  }
+
+  return false;
+}
+
+function openInSidePanel(): void {
+  const sidePanel = chrome.sidePanel;
+
+  if (typeof sidePanel?.open !== "function" || currentWindowId === undefined) {
+    return;
+  }
+
+  if (currentScreen === "export") {
+    void chrome.storage.local
+      .set({ [SIDE_PANEL_SCREEN_KEY]: "export" })
+      .catch(() => undefined);
+  }
+
+  void sidePanel
+    .open({ windowId: currentWindowId })
+    .then(() => {
+      window.close();
+    })
+    .catch((error: unknown) => {
+      devWarn("AI Exporter: could not open side panel", error);
+    });
+}
+
+if (typeof chrome.sidePanel?.open !== "function") {
+  if (openSidePanelButton) {
+    openSidePanelButton.hidden = true;
+  }
+  if (exportSidePanelButton) {
+    exportSidePanelButton.hidden = true;
+  }
+} else {
+  openSidePanelButton?.addEventListener("click", openInSidePanel);
+  exportSidePanelButton?.addEventListener("click", openInSidePanel);
+}
+
+/*
+ * ---------------------------------------------------------
  * STARTUP
  * ---------------------------------------------------------
  *
@@ -3113,5 +3183,44 @@ void initI18n().then(async () => {
   void restoreExportFormat();
   void showCopyShortcut();
   void initUpdateStatus();
-  renderChatCard(await activeTab);
+
+  const tab = await activeTab;
+  currentWindowId = tab?.windowId;
+  renderChatCard(tab);
+
+  if (await detectSidePanelMode()) {
+    document.body.classList.add("is-sidepanel");
+
+    try {
+      const stored = await chrome.storage.local.get(SIDE_PANEL_SCREEN_KEY);
+
+      if (stored[SIDE_PANEL_SCREEN_KEY] === "export") {
+        await chrome.storage.local.remove(SIDE_PANEL_SCREEN_KEY);
+
+        if (!exportButton.disabled) {
+          exportButton.click();
+        }
+      }
+    } catch {
+      /* Ignore storage read errors */
+    }
+
+    chrome.tabs.onActivated?.addListener(() => {
+      void getActiveTab().then((nextTab) => {
+        currentWindowId = nextTab?.windowId;
+        if (currentScreen === "main") {
+          renderChatCard(nextTab);
+        }
+      });
+    });
+
+    chrome.tabs.onUpdated?.addListener((_tabId, changeInfo, updatedTab) => {
+      if (changeInfo.status === "complete" && updatedTab.active) {
+        currentWindowId = updatedTab.windowId;
+        if (currentScreen === "main") {
+          renderChatCard(updatedTab);
+        }
+      }
+    });
+  }
 });

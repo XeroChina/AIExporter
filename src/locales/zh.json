@@ -512,5 +512,7 @@
   "popup.siyuan.emptyTitle": "未找到已打开的笔记本",
   "popup.siyuan.emptyText": "请在思源笔记中打开或新建一个笔记本后重试。",
   "popup.siyuan.errorTitle": "无法连接到思源笔记",
-  "popup.siyuan.savedTitle": "已保存到思源笔记"
+  "popup.siyuan.savedTitle": "已保存到思源笔记",
+  "popup.sidePanel": "侧边栏",
+  "popup.sidePanelTip": "在浏览器右侧全高侧边栏中打开"
 }
